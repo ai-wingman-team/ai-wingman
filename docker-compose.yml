@@ -1,0 +1,69 @@
+# ============================================================================
+# AI Wingman - Docker Compose Configuration
+# ============================================================================
+# Provides PostgreSQL with pgvector extension for local development
+
+services:
+  # PostgreSQL Database with pgvector
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ai_wingman_db
+    restart: unless-stopped
+    
+    environment:
+      # Database credentials (overrideable via .env)
+      POSTGRES_USER: ${POSTGRES_USER:-wingman}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_wingman}
+      
+      # Performance settings
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_MAX_CONNECTIONS: 100
+    
+    ports:
+      # Expose PostgreSQL on default port
+      - "${POSTGRES_PORT:-5433}:5432"
+    
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+      
+      # Run initialization script on first start
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      
+      # Optional: Custom PostgreSQL configuration
+      # - ./postgresql.conf:/etc/postgresql/postgresql.conf
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wingman}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    networks:
+      - ai_wingman_network
+
+  # pgAdmin (Optional - Database Management UI)
+  # Uncomment to enable web-based database management
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: ai_wingman_pgadmin
+  #   restart: unless-stopped
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@ai-wingman.local
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - "5050:80"
+  #   networks:
+  #     - ai_wingman_network
+  #   depends_on:
+  #     - db
+
+networks:
+  ai_wingman_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
