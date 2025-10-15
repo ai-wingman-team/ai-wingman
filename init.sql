@@ -144,7 +144,7 @@ CREATE TRIGGER trigger_user_contexts_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Helper function: Vector similarity search
+-- Helper function: Vector similarity search with input validation
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION search_similar_messages(
     query_embedding vector(384),
@@ -160,6 +160,19 @@ RETURNS TABLE (
     slack_timestamp DECIMAL
 ) AS $$
 BEGIN
+    -- Input validation
+    IF query_embedding IS NULL THEN
+        RAISE EXCEPTION 'query_embedding cannot be NULL';
+    END IF;
+    
+    IF similarity_threshold < 0.0 OR similarity_threshold > 1.0 THEN
+        RAISE EXCEPTION 'similarity_threshold must be between 0.0 and 1.0, got %', similarity_threshold;
+    END IF;
+    
+    IF result_limit < 1 THEN
+        RAISE EXCEPTION 'result_limit must be positive, got %', result_limit;
+    END IF;
+    
     RETURN QUERY
     SELECT 
         sm.id,
@@ -177,6 +190,7 @@ BEGIN
     LIMIT result_limit;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- Grant permissions (if using non-superuser)
 -- ----------------------------------------------------------------------------

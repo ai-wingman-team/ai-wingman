@@ -38,8 +38,13 @@ setup:
 	@echo ""
 	
 	# Check Python version
-	@python3 --version | grep -q "Python 3\.[9-9]\|Python 3\.1[0-9]" || \
-		(echo " Python 3.9+ required" && exit 1)
+	@bash -c 'if python3 -c "import sys; exit(0) if sys.version_info >= (3,9) else exit(1)"; then \
+		echo " Python version OK"; \
+	else \
+		echo " Python 3.9+ required"; \
+		exit 1; \
+	fi'
+
 	@echo " Python version OK"
 	
 	# Check Docker
@@ -121,7 +126,15 @@ db-shell:
 # Reset database (WARNING: deletes all data!)
 db-reset:
 	@echo "  WARNING: This will delete ALL database data!"
-	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	@if [ "$$FORCE" = "1" ]; then \
+		echo "FORCE=1 detected, skipping confirmation..."; \
+	elif [ -t 0 ]; then \
+		read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1; \
+	else \
+		echo " Non-interactive mode detected. Use FORCE=1 to override."; \
+		exit 1; \
+	fi
+
 	@echo "  Resetting database..."
 	@docker compose down -v
 	@docker compose up -d
