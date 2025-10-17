@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.progress import track
 
 from ai_wingman.config import settings
-from ai_wingman.database import get_session, operations
+from ai_wingman.database import db_manager, operations
 from ai_wingman.utils import logger
 
 
@@ -134,7 +134,7 @@ async def demo_create_messages():
     """Demonstrate creating Slack messages."""
     console.print("[bold]2. Creating Sample Messages[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         created_count = 0
 
         for i, msg_data in enumerate(
@@ -145,7 +145,7 @@ async def demo_create_messages():
             slack_ts = datetime.now().timestamp() + i
 
             # Create message with fake embedding
-            message = await operations.create_slack_message(
+            await operations.create_slack_message(
                 session,
                 slack_message_id=slack_msg_id,
                 channel_id=msg_data["channel_id"],
@@ -169,7 +169,7 @@ async def demo_query_messages():
     """Demonstrate querying messages."""
     console.print("[bold]3. Querying Messages[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Get messages by user
         alice_messages = await operations.get_messages_by_user(
             session,
@@ -195,7 +195,7 @@ async def demo_display_messages():
     """Display messages in a formatted table."""
     console.print("[bold]4. Recent Messages[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Get all messages
         all_messages = await operations.get_messages_by_channel(
             session,
@@ -215,7 +215,7 @@ async def demo_display_messages():
                 msg.user_name or msg.user_id,
                 msg.channel_name or msg.channel_id,
                 msg.message_text[:50] + ("..." if len(msg.message_text) > 50 else ""),
-                "" if msg.embedding else "",
+                "✅" if msg.embedding is not None else "❌",
             )
 
         console.print(table)
@@ -227,7 +227,7 @@ async def demo_user_contexts():
     """Demonstrate user context operations."""
     console.print("[bold]5. User Contexts[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Create user contexts
         users = {
             "U001": "Alice",
@@ -295,7 +295,7 @@ async def demo_similarity_search():
     )
     console.print()
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Use a fake query embedding (similar to one of our messages)
         query_embedding = generate_fake_embedding(1)  # Similar to Bob's first message
 
@@ -332,7 +332,7 @@ async def demo_soft_delete():
     """Demonstrate soft delete functionality."""
     console.print("[bold]7. Soft Delete[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Get a message to delete
         messages = await operations.get_messages_by_user(session, "U001", limit=1)
 
@@ -369,7 +369,7 @@ async def demo_summary():
     """Display final summary."""
     console.print("[bold]8. Summary[/bold]")
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         total_messages = await operations.get_message_count(
             session, include_deleted=True
         )
@@ -405,7 +405,7 @@ async def cleanup():
 
     from sqlalchemy import text
 
-    async with get_session() as session:
+    async with db_manager.get_session() as session:
         # Delete all demo data
         await session.execute(
             text(

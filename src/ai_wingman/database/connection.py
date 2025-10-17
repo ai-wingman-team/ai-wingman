@@ -34,25 +34,30 @@ class DatabaseManager:
             f"Creating database engine: {settings.postgres_host}:{settings.postgres_port}"
         )
 
-        # Choose pool based on environment
+        # Choose pool configuration based on environment
         if settings.app_env == "development":
-            # NullPool for development (no connection pooling)
-            pool_class = NullPool
+            # NullPool for development (no pool arguments)
             logger.debug("Using NullPool (no connection pooling)")
+
+            engine = create_async_engine(
+                settings.database_url,
+                echo=settings.debug,
+                poolclass=NullPool,
+                pool_pre_ping=True,
+            )
         else:
             # QueuePool for production
-            pool_class = QueuePool
             logger.debug("Using QueuePool (connection pooling enabled)")
 
-        engine = create_async_engine(
-            settings.database_url,
-            echo=settings.debug,  # Log all SQL statements in debug mode
-            poolclass=pool_class,
-            pool_size=5,  # Number of connections to maintain
-            max_overflow=10,  # Max connections beyond pool_size
-            pool_pre_ping=True,  # Verify connections before using
-            pool_recycle=3600,  # Recycle connections after 1 hour
-        )
+            engine = create_async_engine(
+                settings.database_url,
+                echo=settings.debug,
+                poolclass=QueuePool,
+                pool_size=5,
+                max_overflow=10,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+            )
 
         return engine
 
@@ -70,7 +75,7 @@ class DatabaseManager:
             self._session_factory = async_sessionmaker(
                 self.engine,
                 class_=AsyncSession,
-                expire_on_commit=False,  # Don't expire objects after commit
+                expire_on_commit=False,
             )
         return self._session_factory
 
