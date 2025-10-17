@@ -6,7 +6,8 @@
 # ----------------------------------------------------------------------------
 psycopg2-binary==2.9.9          # PostgreSQL adapter for Python
 pgvector==0.2.5                 # PostgreSQL vector extension support
-sqlalchemy==2.0.25              # SQL toolkit and ORM
+sqlalchemy[asyncio]==2.0.25     # Already there (update to enable async)
+alembic==1.13.1                 # Database migrations
 asyncpg==0.29.0                 # Async PostgreSQL driver
 
 # Embeddings & NLP
