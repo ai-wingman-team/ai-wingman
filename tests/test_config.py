@@ -2,7 +2,6 @@
 Test configuration management.
 """
 
-import pytest
 from ai_wingman.config import settings, Settings
 
 

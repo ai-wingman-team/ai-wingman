@@ -3,7 +3,6 @@ Test database connection and health checks.
 """
 
 import pytest
-from ai_wingman.database import get_session
 
 
 @pytest.mark.asyncio
@@ -18,6 +17,7 @@ async def test_database_health_check(db_health_check):
 async def test_get_session(db_health_check):
     """Test that we can get a database session."""
     from ai_wingman.database import db_manager
+
     async with db_manager.get_session() as session:
         assert session is not None
 
@@ -41,9 +41,11 @@ async def test_session_rollback(db_session):
 async def test_database_schema_exists(db_session):
     """Test that ai_wingman schema exists."""
     from sqlalchemy import text
-    
+
     result = await db_session.execute(
-        text("SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'ai_wingman'")
+        text(
+            "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'ai_wingman'"
+        )
     )
     schema = result.scalar_one_or_none()
     assert schema == "ai_wingman"
@@ -54,7 +56,7 @@ async def test_database_schema_exists(db_session):
 async def test_pgvector_extension_exists(db_session):
     """Test that pgvector extension is installed."""
     from sqlalchemy import text
-    
+
     result = await db_session.execute(
         text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
     )

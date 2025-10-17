@@ -184,7 +184,7 @@ async def test_update_user_context_stats(clean_db, sample_user_data):
     """Test updating user statistics."""
     # Create context
     context = await operations.create_user_context(clean_db, **sample_user_data)
-    assert context is not None 
+    assert context is not None
     await clean_db.commit()
 
     # Update stats
@@ -223,7 +223,7 @@ async def test_update_thread_activity(clean_db, sample_thread_data):
     """Test updating thread activity."""
     # Create thread
     thread = await operations.create_conversation_thread(clean_db, **sample_thread_data)
-    assert thread is not None 
+    assert thread is not None
     await clean_db.commit()
 
     # Update activity
