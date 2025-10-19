@@ -6,7 +6,7 @@ Helper functions for common database tasks.
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select, update, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -176,8 +176,7 @@ async def search_similar_messages(
     user_id: Optional[str] = None,
     channel_id: Optional[str] = None,
 ) -> List[tuple[SlackMessage, float]]:
-    """
-    Search for similar messages using vector similarity.
+    """Search for similar messages using vector similarity.
 
     Args:
         session: Database session
@@ -193,6 +192,13 @@ async def search_similar_messages(
     # Use the SQL function we created in init.sql
     # Note: We'll use raw SQL here since pgvector operations are best done in SQL
 
+    # Validate embedding values before string construction (security)
+    if not query_embedding:
+        raise ValueError("query_embedding cannot be empty")
+    
+    if not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in query_embedding):
+        raise ValueError("Embedding must contain only numeric values")
+    
     # Convert embedding list to PostgreSQL vector format
     embedding_str = f"[{','.join(map(str, query_embedding))}]"
 
@@ -457,10 +463,10 @@ async def update_user_context_stats(
 
     # Update stats
     context.total_messages += increment_messages
-    context.last_message_at = datetime.utcnow()
+    context.last_message_at = datetime.now(timezone.utc)
 
     if context.first_message_at is None:
-        context.first_message_at = datetime.utcnow()
+        context.first_message_at = datetime.now(timezone.utc)
 
     await session.flush()
 
@@ -492,7 +498,7 @@ async def create_conversation_thread(
     thread = ConversationThread(
         thread_ts=thread_ts,
         channel_id=channel_id,
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc),
     )
 
     session.add(thread)
@@ -542,7 +548,7 @@ async def update_thread_activity(
         return None
 
     thread.message_count += increment_messages
-    thread.last_activity_at = datetime.utcnow()
+    thread.last_activity_at = datetime.now(timezone.utc)
 
     await session.flush()
 
