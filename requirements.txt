@@ -2,12 +2,15 @@
 # AI Wingman - Python Dependencies
 # ============================================================================
 
+
 # Core Database & Vector Storage
 # ----------------------------------------------------------------------------
 psycopg2-binary==2.9.9          # PostgreSQL adapter for Python
 pgvector==0.2.5                 # PostgreSQL vector extension support
-sqlalchemy==2.0.25              # SQL toolkit and ORM
+sqlalchemy[asyncio]==2.0.25     # SQL ORM with async support
+alembic==1.13.1                 # Database migrations
 asyncpg==0.29.0                 # Async PostgreSQL driver
+
 
 # Embeddings & NLP
 # ----------------------------------------------------------------------------
@@ -15,15 +18,18 @@ sentence-transformers==2.3.1    # Generate text embeddings
 transformers==4.36.0            # Hugging Face transformers library
 torch==2.8.0                    # PyTorch (for embeddings)
 
+
 # LLM Integration
 # ----------------------------------------------------------------------------
 langchain==0.1.0                # LLM orchestration framework
 langchain-community==0.0.10     # Community integrations
 
+
 # Slack Integration
 # ----------------------------------------------------------------------------
 slack-sdk==3.26.2               # Official Slack SDK
 slack-bolt==1.18.1              # Slack app framework
+
 
 # Configuration Management
 # ----------------------------------------------------------------------------
@@ -31,20 +37,30 @@ python-dotenv==1.0.0            # Load environment variables from .env
 pydantic==2.5.3                 # Data validation using Python type hints
 pydantic-settings==2.1.0        # Settings management with Pydantic
 
+
 # Utilities
 # ----------------------------------------------------------------------------
 numpy==1.26.3                   # Numerical computing
 pandas==2.1.4                   # Data manipulation
 requests==2.31.0                # HTTP library
 
+
 # Development & Testing
 # ----------------------------------------------------------------------------
 pytest==7.4.4                   # Testing framework
 pytest-asyncio==0.23.3          # Async support for pytest
+pytest-cov==4.1.0               # Code coverage reporting
 black==24.1.1                   # Code formatter
 flake8==7.0.0                   # Code linter
 mypy==1.8.0                     # Static type checker
 
+
 # Logging & Monitoring
 # ----------------------------------------------------------------------------
 loguru==0.7.2                   # Advanced logging
+
+
+# Development Experience
+# ----------------------------------------------------------------------------
+rich==13.7.0                    # Rich console output
+ipython==8.20.0                 # Better interactive Python shell

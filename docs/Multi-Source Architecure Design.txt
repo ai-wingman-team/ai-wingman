@@ -1,0 +1,363 @@
+Multi-Source Architecture Design
+Purpose: Documents how Phase 1C's architecture supports multiple data sources beyond Slack.
+
+Date: October 2025
+Status: Design Documentation
+
+Design Philosophy
+While Phase 1C focuses on Slack integration, the architecture is designed to support multiple data sources (Discord, email, manual input, etc.) without major refactoring.
+
+Architecture Overview
+Folder Structure Separates Concerns
+text
+src/ai_wingman/
+├── database/          # Generic database operations
+├── storage/           # Generic storage interface (Phase 2)
+├── retrieval/         # Source-agnostic retrieval (Phase 3)
+├── generation/        # LLM layer (Phase 4)
+└── integrations/      # Source-specific adapters
+    ├── slack/         # Slack integration (Phase 2)
+    ├── discord/       # Future: Discord
+    └── email/         # Future: Email
+Key insight: Source-specific code lives in integrations/, keeping core logic generic.
+
+Extensibility Patterns
+1. Reusable Database Operations
+The operations.py pattern can be replicated for any source:
+
+python
+# Future: src/ai_wingman/database/operations_discord.py
+async def create_discord_message(
+    session: AsyncSession,
+    discord_message_id: str,
+    guild_id: str,
+    author_id: str,
+    content: str,
+    embedding: Optional[List[float]] = None,
+) -> DiscordMessage:
+    """Create Discord message following the same pattern as Slack."""
+    message = DiscordMessage(
+        discord_message_id=discord_message_id,
+        guild_id=guild_id,
+        author_id=author_id,
+        content=content,
+        embedding=embedding,
+    )
+    session.add(message)
+    await session.flush()
+    return message
+
+
+# Future: src/ai_wingman/database/operations_email.py
+async def create_email_message(
+    session: AsyncSession,
+    email_id: str,
+    from_address: str,
+    subject: str,
+    body: str,
+    embedding: Optional[List[float]] = None,
+) -> EmailMessage:
+    """Create email message with vector embedding."""
+    ...
+2. Generic Storage Interface (Phase 2)
+python
+# Future: src/ai_wingman/storage/interface.py
+from abc import ABC, abstractmethod
+from typing import Optional, List
+from uuid import UUID
+
+
+class ContextStorage(ABC):
+    """Generic interface for storing contexts from any source."""
+    
+    @abstractmethod
+    async def store_context(
+        self,
+        content: str,
+        source: str,
+        metadata: dict,
+    ) -> UUID:
+        """
+        Store context regardless of source.
+        
+        Args:
+            content: Text content to store
+            source: Source identifier (slack, discord, email, etc.)
+            metadata: Source-specific metadata
+            
+        Returns:
+            UUID of stored context
+        """
+        pass
+    
+    @abstractmethod
+    async def retrieve_similar(
+        self,
+        query: str,
+        source: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[Context]:
+        """
+        Retrieve similar contexts across sources.
+        
+        Args:
+            query: Search query
+            source: Optional filter by source type
+            limit: Maximum results to return
+            
+        Returns:
+            List of similar contexts with scores
+        """
+        pass
+
+
+# Concrete implementations
+class SlackStorage(ContextStorage):
+    """Slack-specific storage implementation."""
+    
+    async def store_context(self, content, source, metadata):
+        # Delegates to create_slack_message
+        return await operations.create_slack_message(
+            session=self.session,
+            message_text=content,
+            **metadata
+        )
+    
+    async def retrieve_similar(self, query, source=None, limit=5):
+        embedding = await self.embed(query)
+        return await operations.search_similar_messages(
+            session=self.session,
+            query_embedding=embedding,
+            limit=limit
+        )
+
+
+class DiscordStorage(ContextStorage):
+    """Discord-specific storage implementation."""
+    
+    async def store_context(self, content, source, metadata):
+        # Delegates to create_discord_message
+        return await discord_ops.create_discord_message(
+            session=self.session,
+            content=content,
+            **metadata
+        )
+3. Multi-Source Query Example
+python
+# Future: Cross-source similarity search
+async def search_all_sources(
+    session: AsyncSession,
+    query_embedding: List[float],
+    limit: int = 10,
+) -> List[Context]:
+    """
+    Search across all available data sources.
+    
+    Args:
+        session: Database session
+        query_embedding: Query vector
+        limit: Total results to return
+        
+    Returns:
+        Unified list of contexts sorted by similarity
+    """
+    results = []
+    
+    # Search Slack
+    slack_results = await operations.search_similar_messages(
+        session, query_embedding, limit=limit
+    )
+    results.extend([
+        Context(
+            source="slack",
+            content=msg.message_text,
+            score=score,
+            metadata={
+                "channel": msg.channel_name,
+                "user": msg.user_name,
+                "timestamp": msg.slack_timestamp,
+            }
+        )
+        for msg, score in slack_results
+    ])
+    
+    # Search Discord (when implemented)
+    discord_results = await discord_ops.search_similar_messages(
+        session, query_embedding, limit=limit
+    )
+    results.extend([
+        Context(
+            source="discord",
+            content=msg.content,
+            score=score,
+            metadata={
+                "guild": msg.guild_name,
+                "author": msg.author_name,
+                "timestamp": msg.discord_timestamp,
+            }
+        )
+        for msg, score in discord_results
+    ])
+    
+    # Sort by similarity across all sources
+    results.sort(key=lambda x: x.score, reverse=True)
+    return results[:limit]
+Migration Path
+Phase 1C (Current) 
+Slack-specific tables and models
+
+slack_messages table with pgvector embeddings
+
+SlackMessage ORM model
+
+Complete CRUD operations
+
+Working code that proves the concept
+
+Easy to extend later
+
+Phase 2 (Context Storage)
+Add source_type field to track data origin
+
+Implement ContextStorage interface
+
+Keep Slack table, add source adapters
+
+Begin separating source-specific logic
+
+Phase 3+ (Additional Sources)
+Option A: Per-Source Tables (Recommended Initially)
+sql
+-- Discord messages table
+CREATE TABLE ai_wingman.discord_messages (
+    id UUID PRIMARY KEY,
+    discord_message_id VARCHAR(100) UNIQUE,
+    guild_id VARCHAR(100),
+    channel_id VARCHAR(100),
+    author_id VARCHAR(100),
+    content TEXT,
+    embedding vector(384),
+    -- ... similar structure to slack_messages
+);
+
+-- Email messages table
+CREATE TABLE ai_wingman.email_messages (
+    id UUID PRIMARY KEY,
+    email_id VARCHAR(255) UNIQUE,
+    from_address VARCHAR(255),
+    to_address VARCHAR(255),
+    subject TEXT,
+    body TEXT,
+    embedding vector(384),
+    -- ... email-specific fields
+);
+Pros:
+
+Source-specific indexes and constraints
+
+Type-safe queries
+
+Easy to optimize per source
+
+Option B: Generic Contexts Table (Future Refactor)
+sql
+-- Unified context table (as @YongGoose suggested)
+CREATE TABLE ai_wingman.contexts (
+    id UUID PRIMARY KEY,
+    source_type VARCHAR(50),  -- 'slack', 'discord', 'email', etc.
+    source_id VARCHAR(255),   -- ID from source system
+    content TEXT,
+    embedding vector(384),
+    metadata JSONB,           -- Source-specific fields
+    created_at TIMESTAMP,
+    -- ... generic fields
+);
+
+-- Create indexes for efficient querying
+CREATE INDEX idx_contexts_source ON ai_wingman.contexts(source_type);
+CREATE INDEX idx_contexts_embedding ON ai_wingman.contexts 
+    USING hnsw (embedding vector_cosine_ops);
+Pros:
+
+Single query retrieves all contexts
+
+Simpler similarity search across sources
+
+Cleaner architecture
+
+Cons:
+
+Less type-safe (JSONB metadata)
+
+Harder to enforce source-specific constraints
+
+Data Flow (Source-Agnostic)
+text
+┌─────────────────────┐
+│ integrations/slack/ │  ← Get data FROM Slack
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│    storage/         │  ← Store in database (generic)
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│    database/        │  ← PostgreSQL + pgvector
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   retrieval/        │  ← Find similar contexts (any source)
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   generation/       │  ← Generate LLM response (any source)
+└─────────────────────┘
+The LLM and retrieval layers don't care where data originated.
+
+Why This Matters
+Flexibility
+Add new sources without changing core logic. Each source gets its own adapter in integrations/.
+
+Maintainability
+Source-specific code is isolated. Changes to Slack integration don't affect Discord or email.
+
+Scalability
+Query across sources with one unified interface. Users get best results regardless of where information came from.
+
+Future-Proof
+Easy to refactor to generic contexts table when we have 3+ sources and the pattern is proven.
+
+Current Status
+Phase 1C focuses on Slack to:
+
+ Prove the architecture works end-to-end
+
+ Establish patterns for other sources to follow
+
+ Deliver working code quickly
+
+ Validate vector similarity search
+
+When adding sources 2+, we can:
+
+Replicate the Slack pattern (fast, low-risk)
+
+Create discord_messages table
+
+Write operations_discord.py
+
+Implement DiscordStorage adapter
+
+Refactor to generic contexts (cleaner, more work)
+
+Migrate existing Slack data
+
+Update all queries
+
+Rewrite storage layer
+
+The architecture supports both approaches! Choose based on how many sources you're adding and how quickly you need them.
