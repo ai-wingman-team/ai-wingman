@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -267,10 +268,68 @@ class ConversationThread(Base):
         }
 
 
+class ContextMessage(Base):
+    """Generic context message ingested from any source."""
+
+    __tablename__ = "context_messages"
+    __table_args__ = (
+        UniqueConstraint("source", "message_id", "version", name="uq_context_message_version"),
+        {"schema": "ai_wingman"},
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.uuid_generate_v4(),
+    )
+
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    message_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    message_timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
+    is_latest: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    metadata_: Mapped[Dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        server_default="{}",
+    )
+    channel_id: Mapped[Optional[str]] = mapped_column(String(100))
+    thread_id: Mapped[Optional[str]] = mapped_column(String(100))
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert model to dictionary representation."""
+
+        return {
+            "id": str(self.id),
+            "source": self.source,
+            "message_id": self.message_id,
+            "user_id": self.user_id,
+            "content": self.content,
+            "message_timestamp": self.message_timestamp.isoformat()
+            if self.message_timestamp
+            else None,
+            "ingested_at": self.ingested_at.isoformat() if self.ingested_at else None,
+            "is_latest": self.is_latest,
+            "version": self.version,
+            "metadata": self.metadata_,
+            "channel_id": self.channel_id,
+            "thread_id": self.thread_id,
+        }
+
+
 # Export all models
 __all__ = [
     "Base",
     "SlackMessage",
     "UserContext",
     "ConversationThread",
+    "ContextMessage",
 ]

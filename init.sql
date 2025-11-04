@@ -122,6 +122,35 @@ CREATE TABLE IF NOT EXISTS conversation_threads (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table: Generic context messages (shared ingestion surface)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS context_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source VARCHAR(50) NOT NULL,
+    message_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(100),
+    content TEXT NOT NULL,
+    message_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    ingested_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_latest BOOLEAN DEFAULT TRUE,
+    version INTEGER DEFAULT 1,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    channel_id VARCHAR(100),
+    thread_id VARCHAR(100),
+    CONSTRAINT uq_context_message_version UNIQUE (source, message_id, version)
+);
+
+CREATE INDEX idx_context_messages_source_latest
+    ON context_messages(source, message_id)
+    WHERE is_latest = TRUE;
+
+CREATE INDEX idx_context_messages_timestamp
+    ON context_messages(message_timestamp DESC);
+
+CREATE INDEX idx_context_messages_user
+    ON context_messages(user_id)
+    WHERE user_id IS NOT NULL;
+
 -- Helper function: Update updated_at timestamp
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_updated_at_column()
