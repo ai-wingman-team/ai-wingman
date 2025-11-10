@@ -15,7 +15,7 @@ from ai_wingman.database.models import (
     SlackMessage,
     UserContext,
     ConversationThread,
-    ContextMessage,
+    ContextRecord,
 )
 from ai_wingman.utils import logger
 
@@ -570,14 +570,14 @@ async def get_latest_context_message(
     session: AsyncSession,
     source: str,
     message_id: str,
-) -> Optional[ContextMessage]:
+) -> Optional[ContextRecord]:
     """Fetch the latest stored context message for a given source + message."""
 
     stmt = (
-        select(ContextMessage)
-        .where(ContextMessage.source == source)
-        .where(ContextMessage.message_id == message_id)
-        .where(ContextMessage.is_latest.is_(True))
+    select(ContextRecord)
+    .where(ContextRecord.source == source)
+    .where(ContextRecord.message_id == message_id)
+    .where(ContextRecord.is_latest.is_(True))
         .limit(1)
     )
 
@@ -596,7 +596,7 @@ async def append_context_message(
     metadata: Optional[Dict[str, Any]] = None,
     channel_id: Optional[str] = None,
     thread_id: Optional[str] = None,
-) -> tuple[ContextMessage, bool]:
+) -> tuple[ContextRecord, bool]:
     """Append a context message using hybrid timestamp-based strategy.
 
     Returns a tuple of (record, created) where created indicates whether a new
@@ -627,13 +627,13 @@ async def append_context_message(
             return latest, False
 
         version = latest.version + 1
-        if message_timestamp > latest.message_timestamp:
+        if message_timestamp >= latest.message_timestamp:
             latest.is_latest = False
             await session.flush()
         else:
             mark_as_latest = False
 
-    record = ContextMessage(
+    record = ContextRecord(
         source=source,
         message_id=message_id,
         user_id=user_id,
