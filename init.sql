@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS conversation_threads (
 
 -- Table: Generic context messages (shared ingestion surface)
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS context_messages (
+CREATE TABLE IF NOT EXISTS ai_wingman.context_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     source VARCHAR(50) NOT NULL,
     message_id VARCHAR(255) NOT NULL,
@@ -141,14 +141,14 @@ CREATE TABLE IF NOT EXISTS context_messages (
 );
 
 CREATE INDEX idx_context_messages_source_latest
-    ON context_messages(source, message_id)
+    ON ai_wingman.context_messages(source, message_id)
     WHERE is_latest = TRUE;
 
 CREATE INDEX idx_context_messages_timestamp
-    ON context_messages(message_timestamp DESC);
+    ON ai_wingman.context_messages(message_timestamp DESC);
 
 CREATE INDEX idx_context_messages_user
-    ON context_messages(user_id)
+    ON ai_wingman.context_messages(user_id)
     WHERE user_id IS NOT NULL;
 
 -- Helper function: Update updated_at timestamp
