@@ -10,6 +10,7 @@ from ai_wingman.database.models import (
     SlackMessage,
     UserContext,
     ConversationThread,
+    ContextRecord,
 )
 from ai_wingman.database import operations
 
@@ -23,6 +24,7 @@ __all__ = [
     "SlackMessage",
     "UserContext",
     "ConversationThread",
+    "ContextRecord",
     # Operations module
     "operations",
 ]

@@ -25,6 +25,12 @@ langchain==0.1.0                # LLM orchestration framework
 langchain-community==0.0.10     # Community integrations
 
 
+# API Layer
+# ----------------------------------------------------------------------------
+fastapi==0.111.0                # Async web framework for API endpoints
+uvicorn[standard]==0.30.1       # ASGI server
+httpx==0.27.0                   # HTTP client used for testing
+
 # Slack Integration
 # ----------------------------------------------------------------------------
 slack-sdk==3.26.2               # Official Slack SDK

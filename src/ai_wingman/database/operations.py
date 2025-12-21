@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from sqlalchemy import select, update, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai_wingman.database.models import SlackMessage, UserContext, ConversationThread
+from ai_wingman.database.models import (
+    SlackMessage,
+    UserContext,
+    ConversationThread,
+    ContextRecord,
+)
 from ai_wingman.utils import logger
 
 
@@ -557,6 +562,105 @@ async def update_thread_activity(
 
 
 # ============================================================================
+# Context Message Operations
+# ============================================================================
+
+
+async def get_latest_context_message(
+    session: AsyncSession,
+    source: str,
+    message_id: str,
+) -> Optional[ContextRecord]:
+    """Fetch the latest stored context message for a given source + message."""
+
+    stmt = (
+    select(ContextRecord)
+    .where(ContextRecord.source == source)
+    .where(ContextRecord.message_id == message_id)
+    .where(ContextRecord.is_latest.is_(True))
+        .limit(1)
+    )
+
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def append_context_message(
+    session: AsyncSession,
+    *,
+    source: str,
+    message_id: str,
+    content: str,
+    message_timestamp: datetime,
+    user_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    channel_id: Optional[str] = None,
+    thread_id: Optional[str] = None,
+) -> tuple[ContextRecord, bool]:
+    """Append a context message using hybrid timestamp-based strategy.
+
+    Returns a tuple of (record, created) where created indicates whether a new
+    database row was persisted (False implies the message was a duplicate).
+    """
+
+    metadata = metadata or {}
+    latest = await get_latest_context_message(session, source, message_id)
+
+    # Default values for new record
+    version = 1
+    mark_as_latest = True
+
+    if latest is not None:
+        is_duplicate = (
+            message_timestamp <= latest.message_timestamp
+            and content == latest.content
+            and metadata == (latest.metadata_ or {})
+        )
+
+        if is_duplicate:
+            logger.debug(
+                "Context message duplicate detected; skipping append source={} message_id={} timestamp={}",
+                source,
+                message_id,
+                message_timestamp.isoformat(),
+            )
+            return latest, False
+
+        version = latest.version + 1
+        if message_timestamp >= latest.message_timestamp:
+            latest.is_latest = False
+            await session.flush()
+        else:
+            mark_as_latest = False
+
+    record = ContextRecord(
+        source=source,
+        message_id=message_id,
+        user_id=user_id,
+        content=content,
+        message_timestamp=message_timestamp,
+        is_latest=mark_as_latest,
+        version=version,
+        metadata_=metadata,
+        channel_id=channel_id,
+        thread_id=thread_id,
+    )
+
+    session.add(record)
+    await session.flush()
+
+    logger.info(
+        "Appended context message source={} message_id={} version={} latest={}",
+        source,
+        message_id,
+        version,
+        mark_as_latest,
+    )
+
+    return record, True
+
+
+# ============================================================================
 # Bulk Operations
 # ============================================================================
 
@@ -605,4 +709,7 @@ __all__ = [
     "create_conversation_thread",
     "get_conversation_thread",
     "update_thread_activity",
+    # Context messages
+    "append_context_message",
+    "get_latest_context_message",
 ]

@@ -97,6 +97,7 @@ async def clean_db(db_session: AsyncSession) -> AsyncSession:
     await db_session.execute(text("DELETE FROM ai_wingman.slack_messages"))
     await db_session.execute(text("DELETE FROM ai_wingman.user_contexts"))
     await db_session.execute(text("DELETE FROM ai_wingman.conversation_threads"))
+    await db_session.execute(text("DELETE FROM ai_wingman.context_messages"))
     await db_session.commit()
 
     return db_session
